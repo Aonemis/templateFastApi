@@ -26,10 +26,10 @@ def check_password(password: str):
                 raise HTTPException(status_code=404, detail="wrong password need: 1 uppercase, 1 lowercase, 1 number")
     return password
 
-def verify_password(password, hash_password):
+def verify_password(password: str, hash_password: str):
     return pwd_context.verify(password, hash_password)
 
-def get_hash_password(password):
+def get_hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def create_jwt_token(data: dict, access_expire: int | None = None):
@@ -40,7 +40,7 @@ def create_jwt_token(data: dict, access_expire: int | None = None):
     data["exp"] = expire
     return jwt.encode(payload=data, key=SECRET_KEY, algorithm=ALGORITHM)
 
-def get_user_from_jwt_token(token: str = Depends(oauth2_scheme),
+async def get_user_from_jwt_token(token: str = Depends(oauth2_scheme),
                             db: DatabaseWork = Depends(get_database)):
     exc = HTTPException(status_code=401,
                         detail="Haven't user with this token",
@@ -52,7 +52,7 @@ def get_user_from_jwt_token(token: str = Depends(oauth2_scheme),
             raise exc
     except Exception:
         raise exc
-    user = db.get_user_from_db(username=username)
+    user = await db.get_user_from_db(username=username)
     if user is None:
         raise exc
     return user
@@ -64,7 +64,7 @@ async def get_user(user: UserCreate = Depends(get_user_from_jwt_token)):
 @app.post('/login')
 async def user_login(user_data: OAuth2PasswordRequestForm = Depends(),
                      db: DatabaseWork = Depends(get_database)):
-    user = db.get_user_from_db(user_data.username)
+    user = await db.get_user_from_db(user_data.username)
     if not user:
         return HTTPException(status_code=401, detail="wrong username")
     if not verify_password(user_data.password, user.password):
@@ -74,10 +74,10 @@ async def user_login(user_data: OAuth2PasswordRequestForm = Depends(),
     return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/register")
-async def register_user(username: str = Body(min_length=5, max_length=12),
-                        password: str = Body(min_length=8, max_length=20),
+async def register_user(username: str = Body(),
+                        password: str = Body(),
                         db: DatabaseWork = Depends(get_database)):
     password = check_password(password)
     user = UserCreate(username=username, password=get_hash_password(password))
-    result = db.add_user_in_db(**user.model_dump())
+    result = await db.add_user_in_db(user.model_dump())
     return result

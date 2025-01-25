@@ -1,5 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from auth.schemas import UserCreate
 from database.models import User
 
 
@@ -11,11 +13,12 @@ class DatabaseWork:
     async def add_user_in_db(self, data: dict):
         self.session.add(User(**data))
         await self.session.commit()
+        await self.session.flush()
         return {"success": "user add in database"}
 
-    async def get_user_from_db(self, username: str):
+    async def get_user_from_db(self, username: str) -> User:
         result = await self.session.execute(select(User).where(User.username==username))
-        user = result.scalar_one_or_none()
+        user = result.scalars().first()
         if user:
             return user
-        return {"except": f"not found {username}"}
+        raise ValueError("Not found user in DB")
